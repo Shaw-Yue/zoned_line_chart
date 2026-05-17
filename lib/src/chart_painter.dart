@@ -195,15 +195,49 @@ class ChartPainter extends CustomPainter {
 
   // --- Zones (colored horizontal bands) ---
   void _paintZones(Canvas canvas, Rect area) {
-    for (final zone in zones) {
-      final top = _yToScreen(zone.maxY).clamp(area.top, area.bottom);
-      final bottom = _yToScreen(zone.minY).clamp(area.top, area.bottom);
-      if (top >= bottom) continue;
-      canvas.drawRect(
-        Rect.fromLTRB(area.left, top, area.right, bottom),
-        Paint()..color = zone.color.withValues(alpha: 0.12),
-      );
+    if (zones.isEmpty) return;
+
+    final sorted = List<ChartZone>.from(zones)
+      ..sort((a, b) => a.minY.compareTo(b.minY));
+
+    final yMin = metrics.yMin;
+    final yMax = metrics.yMax;
+
+    // Extend the lowest zone downward if chart extends below it
+    if (yMin < sorted.first.minY) {
+      _drawZoneRect(canvas, area, yMin, sorted.first.minY, sorted.first.color);
     }
+
+    // Draw each defined zone
+    for (final zone in sorted) {
+      _drawZoneRect(canvas, area, zone.minY, zone.maxY, zone.color);
+    }
+
+    // Fill gaps between consecutive zones with the nearest zone's color
+    for (int i = 0; i < sorted.length - 1; i++) {
+      final gapBottom = sorted[i].maxY;
+      final gapTop = sorted[i + 1].minY;
+      if (gapTop <= gapBottom) continue;
+      final mid = (gapBottom + gapTop) / 2;
+      _drawZoneRect(canvas, area, gapBottom, mid, sorted[i].color);
+      _drawZoneRect(canvas, area, mid, gapTop, sorted[i + 1].color);
+    }
+
+    // Extend the highest zone upward if chart extends above it
+    if (yMax > sorted.last.maxY) {
+      _drawZoneRect(canvas, area, sorted.last.maxY, yMax, sorted.last.color);
+    }
+  }
+
+  void _drawZoneRect(
+      Canvas canvas, Rect area, double minY, double maxY, Color color) {
+    final top = _yToScreen(maxY).clamp(area.top, area.bottom);
+    final bottom = _yToScreen(minY).clamp(area.top, area.bottom);
+    if (top >= bottom) return;
+    canvas.drawRect(
+      Rect.fromLTRB(area.left, top, area.right, bottom),
+      Paint()..color = color.withValues(alpha: 0.12),
+    );
   }
 
   // --- Target lines (dashed black horizontal lines) ---

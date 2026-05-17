@@ -1,3 +1,7 @@
+## 1.1.2
+
+- Fixed white gaps when data points fall outside predefined zone boundaries. Areas beyond zones are now filled with the nearest zone's color. Gaps between non-contiguous zones are also filled by splitting at the midpoint.
+
 ## 1.1.1
 
 - Widened `intl` dependency to `>=0.19.0 <1.0.0` for compatibility with projects using `intl` 0.19.x or 0.20.x.

@@ -1,3 +1,7 @@
+## 1.1.1
+
+- Widened `intl` dependency to `>=0.19.0 <1.0.0` for compatibility with projects using `intl` 0.19.x or 0.20.x.
+
 ## 1.1.0
 
 - **Collapsible chart**: top-right button to fold/unfold the entire chart area.

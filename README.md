@@ -1,15 +1,19 @@
 # zoned_line_chart
 
-A highly customizable line chart widget for Flutter featuring colored zone backgrounds, automatic axis ticking, smooth curves, and interactive tap-to-inspect tooltips.
+A highly customizable line chart widget for Flutter featuring colored zone backgrounds, practitioner target lines, collapsible UI, data filtering, automatic axis ticking, smooth curves, and interactive tap-to-inspect tooltips.
 
 ## Features
 
+- **Collapsible chart** – A toggle button in the top-right corner to fold/unfold the chart with smooth animation.
+- **Data filtering** – Built-in filter chips (5 / 10 / 20 / 50 / All) to quickly show the most recent N data points.
+- **Zone backgrounds** – Define colored horizontal bands to indicate thresholds (e.g. normal, warning, danger).
+- **Practitioner target lines** – Dashed black horizontal lines with labels for clinical or reference targets.
+- **Two-line X-axis labels** – Date on top (MM/dd), time below (HH:mm) for datetime axes.
+- **Smart label visibility** – All labels shown for small datasets (≤7 points); 4 evenly-spaced labels for larger ones.
 - **Smooth line rendering** – Catmull-Rom spline interpolation for natural-looking curves.
 - **Auto-ticking axes** – Heckbert "nice numbers" algorithm generates clean Y-axis tick values automatically.
-- **Zone backgrounds** – Define colored horizontal bands to indicate thresholds (e.g. normal, warning, danger).
 - **Tap interaction** – Tap any data point to display a tooltip with timestamp, value, and custom notes.
-- **Flexible X-axis** – Supports `time` (HH:mm), `date` (MM-dd), raw `number`, or `string` modes.
-- **Zero dependencies** – Built entirely with Flutter's `CustomPainter`; only `intl` is used for date formatting.
+- **Minimal dependencies** – Built entirely with Flutter's `CustomPainter`; only `intl` is used for date formatting.
 
 ## Installation
 
@@ -17,7 +21,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zoned_line_chart: ^1.0.0
+  zoned_line_chart: ^1.1.0
 ```
 
 Then run:
@@ -45,8 +49,14 @@ CustomLineChart(
     ChartZone(name: 'Low Fever', minY: 37.5, maxY: 38.5, color: Colors.orange),
     ChartZone(name: 'High Fever', minY: 38.5, maxY: 43,  color: Colors.red),
   ],
+  targetLines: [
+    TargetLine(name: 'Target Low',  value: 36.0),
+    TargetLine(name: 'Target High', value: 37.0),
+  ],
   title: 'Temperature Monitoring',
   description: 'Tap a data point for details',
+  collapsible: true,
+  showFilter: true,
 )
 ```
 
@@ -61,12 +71,17 @@ CustomLineChart(
 | `yAxisUnit` | `String` | `''` | Unit string for Y-axis labels & tooltip |
 | `yAxisRange` | `(double, double)?` | auto | Fixed Y range; auto-computed when null |
 | `zones` | `List<ChartZone>` | `[]` | Colored horizontal background bands |
+| `targetLines` | `List<TargetLine>` | `[]` | Dashed horizontal target/reference lines |
 | `title` | `String?` | `null` | Card title above the chart |
 | `description` | `String?` | `null` | Subtitle below the title |
 | `chartHeight` | `double` | `350` | Height of the chart area |
-| `lineColor` | `Color` | Blue (#2563EB) | Color for the line and data dots |
+| `lineColor` | `Color` | `#1860A8` | Color for the line and data dots |
 | `tooltipLabel` | `String?` | `null` | Small label shown above the timestamp in tooltip |
 | `tooltipValueLabel` | `String` | `'Value'` | Label next to the value dot in tooltip |
+| `collapsible` | `bool` | `true` | Show a fold/unfold button in the top-right corner |
+| `initiallyExpanded` | `bool` | `true` | Whether the chart starts expanded |
+| `showFilter` | `bool` | `true` | Show the data-count filter chips |
+| `filterOptions` | `List<int?>` | `[5,10,20,50,null]` | Available filter counts; `null` = "All" |
 
 ### `DataPoint`
 
@@ -86,14 +101,21 @@ CustomLineChart(
 | `color` | `Color` | Zone background and legend color |
 | `label` | `String?` | Optional short label |
 
+### `TargetLine`
+
+| Property | Type | Description |
+|---|---|---|
+| `name` | `String` | Target name (shown on chart and in legend) |
+| `value` | `double` | Y-axis value where the dashed line is drawn |
+
 ### `XAxisUnit`
 
-| Value | Format | Description |
+| Value | Axis Labels | Description |
 |---|---|---|
-| `.time` | `HH:mm` | Time-of-day formatting |
-| `.date` | `MM-dd` | Month-day formatting |
-| `.number` | raw | Numeric display |
-| `.string` | raw | String display |
+| `.time` | MM/dd + HH:mm (two lines) | Date on top, time below |
+| `.date` | MM/dd + HH:mm (two lines) | Date on top, time below |
+| `.number` | raw value | Numeric display |
+| `.string` | raw value | String display |
 
 ## Copy-paste Usage
 

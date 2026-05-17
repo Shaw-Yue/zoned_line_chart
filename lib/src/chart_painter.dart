@@ -13,9 +13,11 @@ class ChartMetrics {
   final List<double> yTicks;
   final double yMin;
   final double yMax;
-  final List<String> xLabels;
+  final List<String> xDateLabels;
+  final List<String> xTimeLabels;
   final List<String> fullTimestamps;
   final List<int> visibleXLabelIndices;
+  final bool hasTimeLabels;
 
   const ChartMetrics({
     required this.plotArea,
@@ -23,9 +25,11 @@ class ChartMetrics {
     required this.yTicks,
     required this.yMin,
     required this.yMax,
-    required this.xLabels,
+    required this.xDateLabels,
+    required this.xTimeLabels,
     required this.fullTimestamps,
     required this.visibleXLabelIndices,
+    required this.hasTimeLabels,
   });
 }
 
@@ -42,15 +46,17 @@ ChartMetrics computeChartMetrics({
   int desiredYTicks = 8,
 }) {
   if (data.isEmpty) {
-    return ChartMetrics(
+    return const ChartMetrics(
       plotArea: Rect.zero,
       pointPositions: [],
       yTicks: [],
       yMin: 0,
       yMax: 1,
-      xLabels: [],
+      xDateLabels: [],
+      xTimeLabels: [],
       fullTimestamps: [],
       visibleXLabelIndices: [],
+      hasTimeLabels: false,
     );
   }
 
@@ -77,17 +83,20 @@ ChartMetrics computeChartMetrics({
   final yMax = yTicks.last;
 
   // --- X labels & timestamps ---
-  final xLabels = <String>[];
+  final xDateLabels = <String>[];
+  final xTimeLabels = <String>[];
   final fullTimestamps = <String>[];
+  final isDateTime = xAxisUnit == XAxisUnit.time || xAxisUnit == XAxisUnit.date;
+
   for (final d in data) {
     final dt = _tryParseDateTime(d.x);
-    if (dt != null && (xAxisUnit == XAxisUnit.time || xAxisUnit == XAxisUnit.date)) {
-      xLabels.add(xAxisUnit == XAxisUnit.time
-          ? DateFormat('HH:mm').format(dt)
-          : DateFormat('MM-dd').format(dt));
+    if (dt != null && isDateTime) {
+      xDateLabels.add(DateFormat('MM/dd').format(dt));
+      xTimeLabels.add(DateFormat('HH:mm').format(dt));
       fullTimestamps.add(DateFormat('yyyy-MM-dd HH:mm').format(dt));
     } else {
-      xLabels.add(d.x.toString());
+      xDateLabels.add(d.x.toString());
+      xTimeLabels.add('');
       fullTimestamps.add(d.x.toString());
     }
   }
@@ -99,7 +108,7 @@ ChartMetrics computeChartMetrics({
   final leftPad = maxYLabel.length * 7.5 + 12;
   const rightPad = 24.0;
   const topPad = 16.0;
-  const bottomPad = 36.0;
+  final bottomPad = isDateTime ? 48.0 : 36.0;
 
   final plotArea = Rect.fromLTRB(
     leftPad,
@@ -118,8 +127,8 @@ ChartMetrics computeChartMetrics({
     positions.add(Offset(x, y));
   }
 
-  // --- Visible X labels (skip overlapping) ---
-  final visibleIndices = _pickVisibleXLabels(xLabels, positions, plotArea.width);
+  // --- Visible X label indices ---
+  final visibleIndices = _smartLabelIndices(data.length);
 
   return ChartMetrics(
     plotArea: plotArea,
@@ -127,9 +136,11 @@ ChartMetrics computeChartMetrics({
     yTicks: yTicks,
     yMin: yMin,
     yMax: yMax,
-    xLabels: xLabels,
+    xDateLabels: xDateLabels,
+    xTimeLabels: xTimeLabels,
     fullTimestamps: fullTimestamps,
     visibleXLabelIndices: visibleIndices,
+    hasTimeLabels: isDateTime,
   );
 }
 
@@ -141,6 +152,7 @@ class ChartPainter extends CustomPainter {
   final List<DataPoint> data;
   final ChartMetrics metrics;
   final List<ChartZone> zones;
+  final List<TargetLine> targetLines;
   final String yAxisUnit;
   final int? selectedIndex;
   final Color lineColor;
@@ -152,9 +164,10 @@ class ChartPainter extends CustomPainter {
     required this.data,
     required this.metrics,
     this.zones = const [],
+    this.targetLines = const [],
     this.yAxisUnit = '',
     this.selectedIndex,
-    this.lineColor = const Color(0xFF2563EB),
+    this.lineColor = const Color(0xFF1860A8),
     this.lineWidth = 3.0,
     this.dotRadius = 4.0,
     this.selectedDotRadius = 7.0,
@@ -170,6 +183,7 @@ class ChartPainter extends CustomPainter {
 
     _paintZones(canvas, area);
     _paintGrid(canvas, area);
+    _paintTargetLines(canvas, area);
     _paintYLabels(canvas, area);
     _paintXLabels(canvas, area);
     _paintSelectedCrosshair(canvas, area);
@@ -189,6 +203,36 @@ class ChartPainter extends CustomPainter {
         Rect.fromLTRB(area.left, top, area.right, bottom),
         Paint()..color = zone.color.withValues(alpha: 0.12),
       );
+    }
+  }
+
+  // --- Target lines (dashed black horizontal lines) ---
+  void _paintTargetLines(Canvas canvas, Rect area) {
+    for (final target in targetLines) {
+      final y = _yToScreen(target.value);
+      if (y < area.top - 5 || y > area.bottom + 5) continue;
+
+      final paint = Paint()
+        ..color = const Color(0xFF333333)
+        ..strokeWidth = 1.2;
+      _drawDashedLine(canvas, Offset(area.left, y), Offset(area.right, y),
+          paint,
+          dash: 6, gap: 4);
+
+      final tp = _makeText(
+          '${target.name} ${_fmtNum(target.value)}$yAxisUnit',
+          9,
+          const Color(0xFF333333));
+      final lx = area.right - tp.width - 4;
+      final ly = y - tp.height - 4;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(lx - 3, ly - 1, tp.width + 6, tp.height + 2),
+          const Radius.circular(2),
+        ),
+        Paint()..color = Colors.white.withValues(alpha: 0.88),
+      );
+      tp.paint(canvas, Offset(lx, ly));
     }
   }
 
@@ -212,13 +256,26 @@ class ChartPainter extends CustomPainter {
     }
   }
 
-  // --- X axis labels ---
+  // --- X axis labels (two-line for datetime) ---
   void _paintXLabels(Canvas canvas, Rect area) {
     for (final i in metrics.visibleXLabelIndices) {
       if (i >= metrics.pointPositions.length) continue;
       final pos = metrics.pointPositions[i];
-      final tp = _makeText(metrics.xLabels[i], 11, const Color(0xFF94A3B8));
-      tp.paint(canvas, Offset(pos.dx - tp.width / 2, area.bottom + 10));
+
+      if (metrics.hasTimeLabels && metrics.xTimeLabels[i].isNotEmpty) {
+        final dateTp =
+            _makeText(metrics.xDateLabels[i], 10, const Color(0xFF64748B));
+        final timeTp =
+            _makeText(metrics.xTimeLabels[i], 10, const Color(0xFF94A3B8));
+        dateTp.paint(
+            canvas, Offset(pos.dx - dateTp.width / 2, area.bottom + 6));
+        timeTp.paint(
+            canvas, Offset(pos.dx - timeTp.width / 2, area.bottom + 20));
+      } else {
+        final tp =
+            _makeText(metrics.xDateLabels[i], 11, const Color(0xFF94A3B8));
+        tp.paint(canvas, Offset(pos.dx - tp.width / 2, area.bottom + 10));
+      }
     }
   }
 
@@ -229,7 +286,8 @@ class ChartPainter extends CustomPainter {
     final paint = Paint()
       ..color = lineColor.withValues(alpha: 0.18)
       ..strokeWidth = 1;
-    _drawDashedLine(canvas, Offset(pos.dx, area.top), Offset(pos.dx, area.bottom), paint);
+    _drawDashedLine(
+        canvas, Offset(pos.dx, area.top), Offset(pos.dx, area.bottom), paint);
   }
 
   // --- Smooth line ---
@@ -263,7 +321,8 @@ class ChartPainter extends CustomPainter {
             ..color = lineColor.withValues(alpha: 0.18)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
         );
-        canvas.drawCircle(pos, selectedDotRadius + 2, Paint()..color = Colors.white);
+        canvas.drawCircle(
+            pos, selectedDotRadius + 2, Paint()..color = Colors.white);
       }
 
       canvas.drawCircle(
@@ -294,7 +353,8 @@ class ChartPainter extends CustomPainter {
   bool shouldRepaint(covariant ChartPainter old) =>
       old.selectedIndex != selectedIndex ||
       old.data != data ||
-      old.zones != zones;
+      old.zones != zones ||
+      old.targetLines != targetLines;
 }
 
 // ===========================================================================
@@ -341,9 +401,7 @@ List<double> _niceLinearTicks(double lo, double hi, int desired) {
 
 DateTime? _tryParseDateTime(dynamic value) {
   if (value is DateTime) return value;
-  if (value is String) {
-    return DateTime.tryParse(value);
-  }
+  if (value is String) return DateTime.tryParse(value);
   return null;
 }
 
@@ -378,26 +436,10 @@ void _drawDashedLine(Canvas canvas, Offset a, Offset b, Paint paint,
   }
 }
 
-List<int> _pickVisibleXLabels(
-    List<String> labels, List<Offset> positions, double plotWidth) {
-  if (labels.isEmpty) return [];
-  if (labels.length <= 2) return List.generate(labels.length, (i) => i);
-
-  final maxLabelPx =
-      labels.map((l) => l.length * 7.0).reduce(max) + 20;
-  final maxVisible = max(2, (plotWidth / maxLabelPx).floor());
-
-  if (labels.length <= maxVisible) {
-    return List.generate(labels.length, (i) => i);
-  }
-
-  final step = ((labels.length - 1) / (maxVisible - 1)).ceil();
-  final indices = <int>[];
-  for (int i = 0; i < labels.length; i += step) {
-    indices.add(i);
-  }
-  if (!indices.contains(labels.length - 1)) {
-    indices.add(labels.length - 1);
-  }
-  return indices;
+/// <= 7 points → show all labels; > 7 → show 4 (first, ~1/3, ~2/3, last).
+List<int> _smartLabelIndices(int count) {
+  if (count <= 0) return [];
+  if (count <= 7) return List.generate(count, (i) => i);
+  final n = count - 1;
+  return [0, (n / 3).round(), (2 * n / 3).round(), n];
 }

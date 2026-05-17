@@ -3,7 +3,8 @@ import 'models.dart';
 import 'chart_painter.dart';
 
 /// A customizable line chart widget with zone backgrounds,
-/// auto-ticking axes, and interactive data point tooltips.
+/// auto-ticking axes, collapsible UI, data filtering,
+/// target lines, and interactive data point tooltips.
 class CustomLineChart extends StatefulWidget {
   /// Data points to plot.
   final List<DataPoint> data;
@@ -20,6 +21,9 @@ class CustomLineChart extends StatefulWidget {
   /// Colored horizontal bands drawn behind the line.
   final List<ChartZone> zones;
 
+  /// Horizontal dashed target lines (e.g. practitioner target).
+  final List<TargetLine> targetLines;
+
   /// Card title shown above the chart.
   final String? title;
 
@@ -32,11 +36,23 @@ class CustomLineChart extends StatefulWidget {
   /// Color of the line and data dots.
   final Color lineColor;
 
-  /// Tooltip title (e.g. "Temperature Log"). Shown above the timestamp.
+  /// Tooltip title (e.g. "TEMP LOG"). Shown above the timestamp.
   final String? tooltipLabel;
 
   /// Tooltip value label (e.g. "Value"). Shown next to the dot.
   final String tooltipValueLabel;
+
+  /// Whether the chart can be collapsed via a button.
+  final bool collapsible;
+
+  /// Whether the chart starts in expanded state.
+  final bool initiallyExpanded;
+
+  /// Whether to show the data-count filter chips.
+  final bool showFilter;
+
+  /// Available filter counts. `null` means "All".
+  final List<int?> filterOptions;
 
   const CustomLineChart({
     super.key,
@@ -45,21 +61,40 @@ class CustomLineChart extends StatefulWidget {
     this.yAxisUnit = '',
     this.yAxisRange,
     this.zones = const [],
+    this.targetLines = const [],
     this.title,
     this.description,
     this.chartHeight = 350,
-    this.lineColor = const Color(0xFF2563EB),
+    this.lineColor = const Color(0xFF1860A8),
     this.tooltipLabel,
     this.tooltipValueLabel = 'Value',
+    this.collapsible = true,
+    this.initiallyExpanded = true,
+    this.showFilter = true,
+    this.filterOptions = const [5, 10, 20, 50, null],
   });
 
   @override
   State<CustomLineChart> createState() => _CustomLineChartState();
 }
 
-class _CustomLineChartState extends State<CustomLineChart>
-    with SingleTickerProviderStateMixin {
+class _CustomLineChartState extends State<CustomLineChart> {
   int? _selectedIndex;
+  late bool _isExpanded;
+  int? _filterCount; // null = All
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  List<DataPoint> get _filteredData {
+    if (_filterCount == null || widget.data.length <= _filterCount!) {
+      return widget.data;
+    }
+    return widget.data.sublist(widget.data.length - _filterCount!);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,47 +118,136 @@ class _CustomLineChartState extends State<CustomLineChart>
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildHeader(),
-            SizedBox(
-              height: widget.chartHeight,
-              child: LayoutBuilder(builder: _buildChart),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity, height: 0),
+              secondChild: _buildBody(),
+              crossFadeState: _isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 300),
+              sizeCurve: Curves.easeInOut,
             ),
-            if (widget.zones.isNotEmpty) _buildLegend(),
           ],
         ),
       ),
     );
   }
 
-  // ----------- header -----------
+  // ----------- header (always visible) -----------
 
   Widget _buildHeader() {
-    if (widget.title == null && widget.description == null) {
-      return const SizedBox.shrink();
-    }
+    final hasTitle = widget.title != null || widget.description != null;
+    if (!hasTitle && !widget.collapsible) return const SizedBox.shrink();
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: EdgeInsets.only(bottom: _isExpanded ? 4 : 0),
+      child: Row(
         children: [
-          if (widget.title != null)
-            Text(
-              widget.title!,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: Color(0xFF0F172A),
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.title != null)
+                  Text(
+                    widget.title!,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                if (widget.description != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      widget.description!,
+                      style:
+                          const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+              ],
             ),
-          if (widget.description != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                widget.description!,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+          ),
+          if (widget.collapsible)
+            GestureDetector(
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: AnimatedRotation(
+                  turns: _isExpanded ? 0 : -0.25,
+                  duration: const Duration(milliseconds: 300),
+                  child: const Icon(Icons.expand_more,
+                      size: 20, color: Color(0xFF64748B)),
+                ),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // ----------- expandable body -----------
+
+  Widget _buildBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showFilter) _buildFilterChips(),
+        SizedBox(
+          height: widget.chartHeight,
+          child: LayoutBuilder(builder: _buildChart),
+        ),
+        if (widget.zones.isNotEmpty || widget.targetLines.isNotEmpty)
+          _buildLegend(),
+      ],
+    );
+  }
+
+  // ----------- filter chips -----------
+
+  Widget _buildFilterChips() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: widget.filterOptions.map((count) {
+          final label = count?.toString() ?? 'All';
+          final isSelected = _filterCount == count;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: GestureDetector(
+              onTap: () => setState(() {
+                _filterCount = count;
+                _selectedIndex = null;
+              }),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? widget.lineColor
+                      : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? Colors.white
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -131,10 +255,11 @@ class _CustomLineChartState extends State<CustomLineChart>
   // ----------- chart area -----------
 
   Widget _buildChart(BuildContext context, BoxConstraints constraints) {
+    final data = _filteredData;
     final size = Size(constraints.maxWidth, constraints.maxHeight);
     final metrics = computeChartMetrics(
       canvasSize: size,
-      data: widget.data,
+      data: data,
       xAxisUnit: widget.xAxisUnit,
       yAxisUnit: widget.yAxisUnit,
       yAxisRange: widget.yAxisRange,
@@ -142,22 +267,25 @@ class _CustomLineChartState extends State<CustomLineChart>
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: (d) => _onTap(d.localPosition, metrics),
+      onTapDown: (d) => _onTap(d.localPosition, metrics, data),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           CustomPaint(
             size: size,
             painter: ChartPainter(
-              data: widget.data,
+              data: data,
               metrics: metrics,
               zones: widget.zones,
+              targetLines: widget.targetLines,
               yAxisUnit: widget.yAxisUnit,
               selectedIndex: _selectedIndex,
               lineColor: widget.lineColor,
             ),
           ),
-          if (_selectedIndex != null) _buildTooltip(metrics),
+          if (_selectedIndex != null &&
+              _selectedIndex! < data.length)
+            _buildTooltip(metrics, data),
         ],
       ),
     );
@@ -165,7 +293,7 @@ class _CustomLineChartState extends State<CustomLineChart>
 
   // ----------- gesture handling -----------
 
-  void _onTap(Offset pos, ChartMetrics metrics) {
+  void _onTap(Offset pos, ChartMetrics metrics, List<DataPoint> data) {
     double best = double.infinity;
     int? idx;
     for (int i = 0; i < metrics.pointPositions.length; i++) {
@@ -182,10 +310,9 @@ class _CustomLineChartState extends State<CustomLineChart>
 
   // ----------- tooltip -----------
 
-  Widget _buildTooltip(ChartMetrics metrics) {
+  Widget _buildTooltip(ChartMetrics metrics, List<DataPoint> data) {
     final i = _selectedIndex!;
-    if (i >= widget.data.length) return const SizedBox.shrink();
-    final point = widget.data[i];
+    final point = data[i];
     final screenPos = metrics.pointPositions[i];
     final timestamp = metrics.fullTimestamps[i];
 
@@ -199,24 +326,20 @@ class _CustomLineChartState extends State<CustomLineChart>
       left: left,
       top: top,
       child: IgnorePointer(
-        child: AnimatedOpacity(
-          opacity: 1.0,
-          duration: const Duration(milliseconds: 180),
-          child: _TooltipCard(
-            timestamp: timestamp,
-            value: point.y,
-            unit: widget.yAxisUnit,
-            note: point.metadata?['note']?.toString(),
-            lineColor: widget.lineColor,
-            label: widget.tooltipLabel,
-            valueLabel: widget.tooltipValueLabel,
-          ),
+        child: _TooltipCard(
+          timestamp: timestamp,
+          value: point.y,
+          unit: widget.yAxisUnit,
+          note: point.metadata?['note']?.toString(),
+          lineColor: widget.lineColor,
+          label: widget.tooltipLabel,
+          valueLabel: widget.tooltipValueLabel,
         ),
       ),
     );
   }
 
-  // ----------- zone legend -----------
+  // ----------- legend (zones + target lines) -----------
 
   Widget _buildLegend() {
     return Column(
@@ -227,31 +350,67 @@ class _CustomLineChartState extends State<CustomLineChart>
         Wrap(
           spacing: 20,
           runSpacing: 10,
-          children: widget.zones.map((z) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(color: z.color, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(z.name,
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
-                const SizedBox(width: 4),
-                Text(
-                  '${_fmtLegendNum(z.minY)}-${_fmtLegendNum(z.maxY)}${widget.yAxisUnit}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF94A3B8),
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
+          children: [
+            ...widget.zones.map((z) => _zoneLegendItem(z)),
+            ...widget.targetLines.map((t) => _targetLegendItem(t)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _zoneLegendItem(ChartZone z) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: z.color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(z.name,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155))),
+        const SizedBox(width: 4),
+        Text(
+          '${_fmtLegendNum(z.minY)}-${_fmtLegendNum(z.maxY)}${widget.yAxisUnit}',
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFF94A3B8),
+            fontFamily: 'monospace',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _targetLegendItem(TargetLine t) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Dashed line icon
+        SizedBox(
+          width: 16,
+          height: 10,
+          child: CustomPaint(painter: _DashIconPainter()),
+        ),
+        const SizedBox(width: 6),
+        Text(t.name,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155))),
+        const SizedBox(width: 4),
+        Text(
+          '${_fmtLegendNum(t.value)}${widget.yAxisUnit}',
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFF94A3B8),
+            fontFamily: 'monospace',
+          ),
         ),
       ],
     );
@@ -259,6 +418,29 @@ class _CustomLineChartState extends State<CustomLineChart>
 
   String _fmtLegendNum(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+}
+
+// ---------------------------------------------------------------------------
+// Small painter for the dashed-line legend icon
+// ---------------------------------------------------------------------------
+
+class _DashIconPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF333333)
+      ..strokeWidth = 1.5;
+    final y = size.height / 2;
+    double x = 0;
+    while (x < size.width) {
+      final end = (x + 3).clamp(0.0, size.width);
+      canvas.drawLine(Offset(x, y), Offset(end, y), paint);
+      x += 5;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ---------------------------------------------------------------------------

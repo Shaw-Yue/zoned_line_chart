@@ -38,12 +38,20 @@ class ChartZone {
   });
 }
 
+/// A horizontal dashed target line (e.g. practitioner target).
+class TargetLine {
+  final String name;
+  final double value;
+
+  const TargetLine({required this.name, required this.value});
+}
+
 /// Controls how the X axis values are formatted.
 enum XAxisUnit {
-  /// Format as HH:mm
+  /// Format as date + time (two-line label)
   time,
 
-  /// Format as MM-dd
+  /// Format as date + time (two-line label)
   date,
 
   /// Display raw numeric value

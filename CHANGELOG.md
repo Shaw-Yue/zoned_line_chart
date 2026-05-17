@@ -1,3 +1,12 @@
+## 1.1.0
+
+- **Collapsible chart**: top-right button to fold/unfold the entire chart area.
+- **Data filter chips**: quickly show the most recent 5, 10, 20, 50, or all data points.
+- **Practitioner target lines** (`TargetLine`): horizontal dashed black lines with labels, included in the legend.
+- **Two-line X-axis labels**: date on top, time below (for `time`/`date` axis modes).
+- **Smart label visibility**: all labels shown for ≤7 points; 4 evenly-spaced labels for larger datasets.
+- **Default line color** changed to `#1860A8`.
+
 ## 1.0.0
 
 - Initial release.

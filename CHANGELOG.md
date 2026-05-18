@@ -1,3 +1,7 @@
+## 1.1.4
+
+- Fixed README install version to match the latest published version.
+
 ## 1.1.3
 
 - Updated README: documented zone auto-extension behavior, updated install version, and noted widened `intl` compatibility.

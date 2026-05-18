@@ -21,7 +21,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zoned_line_chart: ^1.1.2
+  zoned_line_chart: ^1.1.4
 ```
 
 Then run:

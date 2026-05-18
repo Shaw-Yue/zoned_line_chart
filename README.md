@@ -6,14 +6,14 @@ A highly customizable line chart widget for Flutter featuring colored zone backg
 
 - **Collapsible chart** – A toggle button in the top-right corner to fold/unfold the chart with smooth animation.
 - **Data filtering** – Built-in filter chips (5 / 10 / 20 / 50 / All) to quickly show the most recent N data points.
-- **Zone backgrounds** – Define colored horizontal bands to indicate thresholds (e.g. normal, warning, danger).
+- **Zone backgrounds** – Define colored horizontal bands to indicate thresholds (e.g. normal, warning, danger). Areas beyond the defined zones are automatically filled with the nearest zone's color — no white gaps.
 - **Practitioner target lines** – Dashed black horizontal lines with labels for clinical or reference targets.
 - **Two-line X-axis labels** – Date on top (MM/dd), time below (HH:mm) for datetime axes.
 - **Smart label visibility** – All labels shown for small datasets (≤7 points); 4 evenly-spaced labels for larger ones.
 - **Smooth line rendering** – Catmull-Rom spline interpolation for natural-looking curves.
 - **Auto-ticking axes** – Heckbert "nice numbers" algorithm generates clean Y-axis tick values automatically.
 - **Tap interaction** – Tap any data point to display a tooltip with timestamp, value, and custom notes.
-- **Minimal dependencies** – Built entirely with Flutter's `CustomPainter`; only `intl` is used for date formatting.
+- **Minimal dependencies** – Built entirely with Flutter's `CustomPainter`; only `intl` (>=0.19.0 <1.0.0) is used for date formatting.
 
 ## Installation
 
@@ -21,7 +21,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zoned_line_chart: ^1.1.0
+  zoned_line_chart: ^1.1.2
 ```
 
 Then run:

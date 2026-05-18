@@ -1,3 +1,7 @@
+## 1.1.3
+
+- Updated README: documented zone auto-extension behavior, updated install version, and noted widened `intl` compatibility.
+
 ## 1.1.2
 
 - Fixed white gaps when data points fall outside predefined zone boundaries. Areas beyond zones are now filled with the nearest zone's color. Gaps between non-contiguous zones are also filled by splitting at the midpoint.
